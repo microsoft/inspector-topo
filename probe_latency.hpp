@@ -1,8 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // All rights reserved.
 
-#ifndef __PROBE__
-#define __PROBE__
+#ifndef __PROBE_LATENCY__
+#define __PROBE_LATENCY__
 
 #include "Endpoint.hpp"
 #include "Loopback.hpp"
@@ -13,4 +13,4 @@ double probe_latency_from_core(int16_t core);
 double probe_latency_from_numa_node(int node);
 
 
-#endif
+#endif // __PROBE_LATENCY__

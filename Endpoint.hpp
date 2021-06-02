@@ -77,7 +77,7 @@ public:
   void free(ibv_mr * mr);
 
   /// accessor for ticks_per_sec
-  inline const uint64_t get_ticks_per_sec() const { return ticks_per_sec; }
+  inline uint64_t get_ticks_per_sec() const { return ticks_per_sec; }
 };
 
 

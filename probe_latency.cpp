@@ -6,9 +6,6 @@
 #include <gflags/gflags.h>
 
 #include <iostream>
-//#include <iomanip>
-#include <chrono>
-//#include <cmath>
 #include <vector>
 #include <algorithm>
 
@@ -82,14 +79,14 @@ double probe_latency() {
   // Initialize loopback connection
   Loopback lp(e);
   
-  // Allocate memory regions
-  ibv_mr * source_mr = e.allocate(FLAGS_length);
-  ibv_mr * dest_mr   = e.allocate(FLAGS_length);
+  // Allocate memory region. We copy to and from the same buffer,
+  // since we care only about data movement, not the result.
+  ibv_mr * mr = e.allocate(FLAGS_length);
 
   ibv_sge send_sge;
-  send_sge.addr   = reinterpret_cast<uintptr_t>(dest_mr->addr);
+  send_sge.addr   = reinterpret_cast<uintptr_t>(mr->addr);
   send_sge.length = 1;
-  send_sge.lkey   = dest_mr->lkey;
+  send_sge.lkey   = mr->lkey;
     
   ibv_send_wr send_wr;
   send_wr.wr_id = 0;
@@ -98,8 +95,8 @@ double probe_latency() {
   send_wr.num_sge = 1;
   send_wr.opcode = IBV_WR_RDMA_READ;
   send_wr.send_flags = IBV_SEND_SIGNALED;
-  send_wr.wr.rdma.remote_addr = reinterpret_cast<uintptr_t>(source_mr->addr);
-  send_wr.wr.rdma.rkey = source_mr->rkey;
+  send_wr.wr.rdma.remote_addr = reinterpret_cast<uintptr_t>(mr->addr);
+  send_wr.wr.rdma.rkey = mr->rkey;
 
   // do warmup iterations
   for (int i = 0; i < FLAGS_warmup; ++i) {

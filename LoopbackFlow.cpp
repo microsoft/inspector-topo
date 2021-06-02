@@ -27,7 +27,8 @@ void LoopbackFlow::thread_body(int numa_node) {
   // Initialize loopback connection
   Loopback lp(e);
   
-  // Allocate memory region
+  // Allocate memory region. We copy to and from the same buffer,
+  // since we care only about data movement, not the result.
   ibv_mr * mr = e.allocate(FLAGS_length);
 
   // reuse same SGE for all reads
