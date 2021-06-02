@@ -49,6 +49,12 @@ private:
   ibv_cq * create_completion_queue();
   ibv_qp * create_queue_pair(ibv_cq * completion_queue);
 
+  /// completion queue
+  ibv_cq * completion_queue;
+
+  /// loopback QP
+  ibv_qp * queue_pair;
+  
   void move_to_init(ibv_qp *);
   void move_to_rtr(ibv_qp *);
   void move_to_rts(ibv_qp *);
@@ -59,25 +65,14 @@ public:
     , completion_queue(nullptr)
     , queue_pair(nullptr)
   {
-    // do this later to support server overload
-    //set_up_queue_pairs();
-  }
-
-  /// completion queue
-  ibv_cq * completion_queue;
-
-  /// loopback QP
-  ibv_qp * queue_pair;
-  
-  void connect() {
     initialize_queue_pairs();
     connect_queue_pairs();
   }
 
-  static void post_recv(ibv_qp * qp, ibv_recv_wr * wr) {
+  inline void post_recv(ibv_recv_wr * wr) {
     ibv_recv_wr * bad_wr = nullptr;
     
-    int retval = ibv_post_recv(qp, wr, &bad_wr);
+    int retval = ibv_post_recv(queue_pair, wr, &bad_wr);
     if (retval < 0) {
       std::cerr << "Error " << retval << " posting receive WR startgin at WR " << wr << " id " << (void*) wr->wr_id << std::endl;
       perror( "Error posting receive WR" );
@@ -92,10 +87,10 @@ public:
     }
   }
 
-  static void post_send(ibv_qp * qp, ibv_send_wr * wr) {
+  inline void post_send(ibv_send_wr * wr) {
     ibv_send_wr * bad_wr = nullptr;
 
-    int retval = ibv_post_send(qp, wr, &bad_wr);
+    int retval = ibv_post_send(queue_pair, wr, &bad_wr);
     if (retval < 0) {
       std::cerr << "Error " << retval
                 << " posting send WR starting at WR " << wr
@@ -116,8 +111,8 @@ public:
     }
   }
 
-  static int poll_cq(ibv_cq * cq, int max_entries, ibv_wc completions[]) {
-    int retval = ibv_poll_cq(cq, max_entries, &completions[0]);
+  inline int poll_cq(int max_entries, ibv_wc completions[]) {
+    int retval = ibv_poll_cq(completion_queue, max_entries, &completions[0]);
 
     if (retval < 0) {
       std::cerr << "Failed polling completion queue with status " << retval << std::endl;

@@ -2,9 +2,9 @@
 ## All rights reserved.
 
 TARGET=topodetect
-OBJECTS=topodetect.o Endpoint.o Loopback.o probe.o
+OBJECTS=topodetect.o Endpoint.o Loopback.o probe.o LoopbackFlow.o
 
-# Uncomment to enable debug logging
+# Uncomment to enable verbose debug logging
 ###DEBUG_LOG=-DDEBUG_LOG
 
 CXXFLAGS+=-std=c++14 -g -MMD -O3 $(DEBUG_LOG)
