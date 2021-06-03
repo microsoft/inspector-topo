@@ -13,8 +13,30 @@ Requirements
 ------------
 
 The tool currently depends on these libraries:
-* ibverbs
+* ibverbs (but is likely already installed)
 * numa
 * hugetlbfs
 * gflags
+
+On Ubuntu, you can install them like this:
+```
+sudo apt install libnuma-dev libhugetlbfs-dev libgflags-dev
+```
+
+Building
+--------
+
+Just run ```make```.
+
+Running
+-------
+
+GPU IDs are not yet handled in a smart way. You MUST set ```CUDA_VISIBLE_DEVICES``` before running to get results that make sense. For now, use a command like this:
+```
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./topodetect
+```
+
+For the GPU bandwidth tests, the tool defaults to copying a 1 GB buffer 10 times. This is probably fine, but you can change the buffer size with the ```--length``` flag and the GPU bandwidth iteration count with the ```--bw_iters``` flag if you want.
+
+
 
