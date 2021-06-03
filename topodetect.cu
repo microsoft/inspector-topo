@@ -45,6 +45,8 @@ int main(int argc, char * argv[]) {
   if (1 == gpu_count) {
     std::cout << "Simple case: single GPU. Not detecting NUMA node." << std::endl;
   } else {
+    GPUBuffers buffers;
+    
     // Track the pair with highest aggregate bandwidth.    
     double max_bw = std::numeric_limits<double>::min();
     int max_gpuA = 0;
@@ -72,7 +74,7 @@ int main(int argc, char * argv[]) {
 	// TODO: probably don't need full matrix, but run it for now.
         //for (int gpuB = gpuA + 1; gpuB < gpu_count; ++gpuB) {
 	for (int gpuB = 0; gpuB < gpu_count; ++gpuB) {
-	  double bw = probe_gpu_bandwidth_from_numa_node(nodeA, gpuA, nodeB, gpuB);
+	  double bw = buffers.double_memcpy_probe(nodeA, gpuA, nodeB, gpuB);
           
           // update best pair
           if (bw > max_bw) {

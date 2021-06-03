@@ -31,7 +31,7 @@ Just run ```make```.
 Running
 -------
 
-GPU IDs are not yet handled in a smart way. You MUST set ```CUDA_VISIBLE_DEVICES``` before running to get results that make sense. For now, use a command like this:
+GPU IDs are not yet handled in a smart way. You MUST set ```CUDA_VISIBLE_DEVICES``` before running to get results that make sense. For now on the 8-GPU ND40v2 nodes, use a command like this:
 ```
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./topodetect
 ```

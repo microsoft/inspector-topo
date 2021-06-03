@@ -98,3 +98,74 @@ double probe_gpu_bandwidth_from_numa_node(int numa_nodeA, int gpuA, int numa_nod
 	    << std::endl;
   return bw;
 }
+
+
+void * GPUBuffers::allocate_cpu_buffer(int numa_node) {
+  // what NUMA node are we allocating from right now?
+  int prev_preferred = numa_preferred();
+  std::cout << "Previous preferred: " << prev_preferred << std::endl;
+
+  // set NUMA node for this allocation
+  numa_set_preferred(numa_node);
+
+  // allocate buffer
+  void * host_buf = nullptr;
+  CHECK_CUDA(cudaHostAlloc(&host_buf, FLAGS_length, cudaHostAllocWriteCombined));
+
+  // restore previous NUMA policy
+  numa_set_preferred(prev_preferred);
+
+  // return buffer
+  return host_buf;
+}
+
+void GPUBuffers::free_cpu_buffer(void * buf) {
+  CHECK_CUDA(cudaFreeHost(buf));
+}
+
+void * GPUBuffers::allocate_gpu_buffer(int gpu_id) {
+  void * device_buf = nullptr;
+  CHECK_CUDA(cudaSetDevice(gpu_id));
+  CHECK_CUDA(cudaMalloc(&device_buf, FLAGS_length));
+  return device_buf;
+}
+
+void GPUBuffers::free_gpu_buffer(void * buf) {
+  CHECK_CUDA(cudaFree(buf));
+}
+
+void GPUBuffers::allocate_gpu_stream(int gpu_id, cudaStream_t * stream) {
+  CHECK_CUDA(cudaSetDevice(gpu_id));
+  CHECK_CUDA(cudaStreamCreateWithFlags(stream, cudaStreamNonBlocking));
+}
+
+void GPUBuffers::free_gpu_stream(cudaStream_t * stream) {
+  CHECK_CUDA(cudaStreamDestroy(*stream));
+  *stream = nullptr;
+}
+
+
+double GPUBuffers::double_memcpy_probe(int numa_nodeA, int gpuA, 
+                                       int numa_nodeB, int gpuB) {
+  auto start_time = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < FLAGS_bw_iters; ++i) {
+    CHECK_CUDA(cudaSetDevice(gpuA));  
+    CHECK_CUDA(cudaMemcpyAsync(cpu_buffers[numa_nodeA], gpu_buffers[gpuA], FLAGS_length, cudaMemcpyDeviceToHost, gpu_streams[gpuA]));
+    CHECK_CUDA(cudaSetDevice(gpuB));  
+    CHECK_CUDA(cudaMemcpyAsync(gpu_buffers[gpuB], cpu_buffers[numa_nodeB], FLAGS_length, cudaMemcpyHostToDevice, gpu_streams[gpuB]));    
+  }
+
+  CHECK_CUDA(cudaSetDevice(gpuA));
+  CHECK_CUDA(cudaStreamSynchronize(gpu_streams[gpuA]));
+  CHECK_CUDA(cudaSetDevice(gpuB));
+  CHECK_CUDA(cudaStreamSynchronize(gpu_streams[gpuB]));
+  auto end_time = std::chrono::high_resolution_clock::now();  
+
+  uint64_t time_difference_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
+  double bw = (double) FLAGS_length / (time_difference_ns / 1e9) / 1024 / 1024 / 1024 * FLAGS_bw_iters;
+  std::cout << "Measured per-GPU bandwidth of " << bw
+	    << " for GPU " << gpuA << " on NUMA node " << numa_nodeA << " doing DtoH" 
+	    << " and GPU " << gpuB << " on NUMA node " << numa_nodeB << " doing HtoD" 
+	    << std::endl;
+  return bw;
+}
