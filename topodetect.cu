@@ -5,6 +5,7 @@
 #include "LoopbackFlow.hpp"
 #include "probe_gpu_bandwidth.hpp"
 
+#include <cstdlib>
 #include <gflags/gflags.h>
 #include <numa.h>
 
@@ -44,8 +45,6 @@ int main(int argc, char * argv[]) {
   if (1 == gpu_count) {
     std::cout << "Simple case: single GPU. Not detecting NUMA node." << std::endl;
   } else {
-    double gpu_pair_bw[gpu_count][gpu_count] = {0.0};
-
     // Track the pair with highest aggregate bandwidth.    
     double max_bw = std::numeric_limits<double>::min();
     int max_gpuA = 0;
@@ -59,11 +58,21 @@ int main(int argc, char * argv[]) {
 
     { // Start loopback flow between NIC and the DRAM of the CPU it is nearest.
       LoopbackFlow flow(min_numa_node);
+
+      // TODO: set CUDA_VISIBLE_DEVICES to match our detected GPU count in a way that works
+      //int retval = setenv("CUDA_VISIBLE_DEVICES", "0,1,2,3,4,5,6,7", 1);
+      
+      // TODO: explore NUMA node placement. For now, run everything from the node closest to the NIC.
+      // for (int nodeA = 0; nodeA < 2; ++nodeA) {
+      // 	for (int nodeB = 0; nodeB < 2; ++nodeB) {
+      int nodeA = min_numa_node;
+      int nodeB = min_numa_node;
       
       for (int gpuA = 0; gpuA < gpu_count; ++gpuA) {
-        for (int gpuB = gpuA + 1; gpuB < gpu_count; ++gpuB) {
-          double bw = probe_gpu_bandwidth_from_numa_node(min_numa_node, gpuA, gpuB);
-          gpu_pair_bw[gpuA][gpuB] = bw;
+	// TODO: probably don't need full matrix, but run it for now.
+        //for (int gpuB = gpuA + 1; gpuB < gpu_count; ++gpuB) {
+	for (int gpuB = 0; gpuB < gpu_count; ++gpuB) {
+	  double bw = probe_gpu_bandwidth_from_numa_node(nodeA, gpuA, nodeB, gpuB);
           
           // update best pair
           if (bw > max_bw) {
@@ -78,15 +87,19 @@ int main(int argc, char * argv[]) {
             min_gpuA = gpuA;
             min_gpuB = gpuB;
           }
+
+	  //break;
         }
       }
+      // }
+      // }
     }
 
-    std::cout << "Best GPU pair was " << max_gpuA << " and " << max_gpuB
-              << " with a bandwidth of " << max_bw
-              << std::endl;
     std::cout << "GPU pair shared with NIC appears to be " << min_gpuA << " and " << min_gpuB
               << " with a bandwidth of " << min_bw
+              << std::endl;
+    std::cout << "Best GPU pair was " << max_gpuA << " doing DtoH and " << max_gpuB
+              << " doing HtoD with a bandwidth of " << max_bw
               << std::endl;
   }
 

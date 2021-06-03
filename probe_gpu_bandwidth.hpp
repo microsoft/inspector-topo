@@ -22,6 +22,6 @@ void check_cuda(T result, char const *const func, const char *const file,
 
 #define CHECK_CUDA(val) check_cuda((val), #val, __FILE__, __LINE__)
 
-  double probe_gpu_bandwidth_from_numa_node(int numa_node, int gpuA, int gpuB);
+double probe_gpu_bandwidth_from_numa_node(int nodeA, int gpuA, int nodeB, int gpuB);
 
 #endif // __PROBE_GPU_BANDWIDTH__
