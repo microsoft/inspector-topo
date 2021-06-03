@@ -8,7 +8,7 @@
 #include <iostream>
 #include <chrono>
 
-#include <x86intrin.h>
+//#include <x86intrin.h> // TODO: nvcc doesn't like this on some CUDA versions with some GCC versions?
 #include <numa.h>
 #include <gflags/gflags.h>
 
