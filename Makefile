@@ -18,8 +18,7 @@ LDFLAGS+= -L/usr/local/lib \
 	-Xcompiler="-pthread" \
 	-lnuma \
 	-libverbs \
-	-lgflags \
-	-lhugetlbfs
+	-lgflags
 
 
 $(TARGET): $(OBJECTS)

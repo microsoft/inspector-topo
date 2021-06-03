@@ -205,7 +205,8 @@ ibv_mr * Endpoint::allocate(size_t length,
                             bool use_hugepages,
                             void * requested_address) {
   // round up to default huge page size
-  size_t hugepagesize = gethugepagesize();
+  // TODO: guess 2MB huge pages for now to avoid using hugetlbfs in Docker container
+  size_t hugepagesize = 1ULL << 21; //gethugepagesize();
   if (hugepagesize < 0) {
     std::cerr << "Error getting default huge page size" << std::endl;
     exit(1);
