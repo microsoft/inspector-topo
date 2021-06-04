@@ -229,8 +229,8 @@ double GPUBuffers::double_memcpy_probe(int numa_nodeA, int gpuA, bool htod_or_dt
   // 	    << std::endl;
 
   std::cout << "WC:" << use_write_combining
-	    << " GPU:" << gpuA << " node:" << numa_nodeA << " dir:" << (htod_or_dtohA ? "HtoD" : "DtoH")
-	    << " GPU:" << gpuB << " node:" << numa_nodeB << " dir:" << (htod_or_dtohB ? "HtoD" : "DtoH")
+	    << " GPUA:" << gpuA << " nodeA:" << numa_nodeA << " dirA:" << (htod_or_dtohA ? "HtoD" : "DtoH")
+	    << " GPUB:" << gpuB << " nodeB:" << numa_nodeB << " dirB:" << (htod_or_dtohB ? "HtoD" : "DtoH")
 	    << " BW:" << bw
   	    << std::endl;
   
