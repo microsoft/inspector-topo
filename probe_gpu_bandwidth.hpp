@@ -31,6 +31,7 @@ class GPUBuffers {
 private:
   int gpu_count;
   const int numa_node_count;
+  const bool use_write_combining;
   
   std::vector<void *> cpu_buffers;
   std::vector<void *> gpu_buffers;
@@ -45,9 +46,10 @@ private:
   void free_gpu_stream(cudaStream_t *);
   
 public:
-  GPUBuffers()
+  GPUBuffers(bool use_write_combining = false)
     : gpu_count(-1)
-    , numa_node_count(numa_max_node())
+    , numa_node_count(numa_max_node()+1)
+    , use_write_combining(use_write_combining)
     , cpu_buffers(numa_node_count)
     , gpu_buffers()
     , gpu_streams()
@@ -60,6 +62,7 @@ public:
     }
 
     // allocate one buffer on each GPU
+    gpu_buffers.resize(gpu_count);
     for (int gpu = 0; gpu < gpu_count; ++gpu) {
       gpu_buffers[gpu] = allocate_gpu_buffer(gpu);
     }
@@ -98,7 +101,8 @@ public:
   void * get_cpu_buffer(int cpu_id) const { return cpu_buffers[cpu_id]; }
   void * get_gpu_buffer(int gpu_id) const { return gpu_buffers[gpu_id]; };
 
-  double double_memcpy_probe(int numa_nodeA, int gpu_idA, int numa_nodeB, int gpu_idB);
+  double double_memcpy_probe(int numa_nodeA, int gpu_idA, bool htod_or_dtohA,
+			     int numa_nodeB, int gpu_idB, bool htod_or_dtohB);
 };
 
 

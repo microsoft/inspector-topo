@@ -11,6 +11,7 @@
 
 #include <vector>
 #include <limits>
+#include <tuple>
 
 DEFINE_int32(warmup,       100, "Number of warmup iterations to run before timing (defults to 100).");
 DEFINE_int32(iters,       1000, "Number of timed iterations to run (defaults to 1000).");
@@ -40,69 +41,91 @@ int main(int argc, char * argv[]) {
 
   // Now probe bandwith to all pairs of GPUs while NIC is processing a
   // loopback flow.
-  int gpu_count = 0;
-  CHECK_CUDA(cudaGetDeviceCount(&gpu_count));
-  if (1 == gpu_count) {
+  GPUBuffers buffers(false); // false is mapped; true is write-combining
+  if (1 == buffers.get_gpu_count()) {
     std::cout << "Simple case: single GPU. Not detecting NUMA node." << std::endl;
   } else {
-    GPUBuffers buffers;
     
     // Track the pair with highest aggregate bandwidth.    
     double max_bw = std::numeric_limits<double>::min();
     int max_gpuA = 0;
     int max_gpuB = 1;
+    std::tuple<int, int, bool, int, int, bool> max_args;
 
     // Track the pair with lowest aggregate bandwidth. This should be
     // the one shared with the NIC.
     double min_bw = std::numeric_limits<double>::max();
     int min_gpuA = 0;
     int min_gpuB = 1;
-
+    std::tuple<int, int, bool, int, int, bool> min_args;
+    
     { // Start loopback flow between NIC and the DRAM of the CPU it is nearest.
       LoopbackFlow flow(min_numa_node);
 
       // TODO: set CUDA_VISIBLE_DEVICES to match our detected GPU count in a way that works
       //int retval = setenv("CUDA_VISIBLE_DEVICES", "0,1,2,3,4,5,6,7", 1);
-      
-      // TODO: explore NUMA node placement. For now, run everything from the node closest to the NIC.
-      // for (int nodeA = 0; nodeA < 2; ++nodeA) {
-      // 	for (int nodeB = 0; nodeB < 2; ++nodeB) {
-      int nodeA = min_numa_node;
-      int nodeB = min_numa_node;
-      
-      for (int gpuA = 0; gpuA < gpu_count; ++gpuA) {
-	// TODO: probably don't need full matrix, but run it for now.
-        //for (int gpuB = gpuA + 1; gpuB < gpu_count; ++gpuB) {
-	for (int gpuB = 0; gpuB < gpu_count; ++gpuB) {
-	  double bw = buffers.double_memcpy_probe(nodeA, gpuA, nodeB, gpuB);
-          
-          // update best pair
-          if (bw > max_bw) {
-            max_bw = bw;
-            max_gpuA = gpuA;
-            max_gpuB = gpuB;
-          }
 
-          // update worst pair
-          if (bw < min_bw) {
-            min_bw = bw;
-            min_gpuA = gpuA;
-            min_gpuB = gpuB;
-          }
+      // try both HtoD (true) and DtoH (false) directions
+      for (bool dirA = false; dirA != true; dirA = true) {
+	for (bool dirB = false; dirB != true; dirB = true) {
+	
+	  for (int nodeA = 0; nodeA < buffers.get_cpu_count(); ++nodeA) {
+	    for (int nodeB = 0; nodeB < buffers.get_cpu_count(); ++nodeB) {
+	      //int nodeA = min_numa_node;
+	      //int nodeB = min_numa_node;
+      
+	      for (int gpuA = 0; gpuA < buffers.get_gpu_count(); ++gpuA) {
+		//for (int gpuB = gpuA + 1; gpuB < gpu_count; ++gpuB) {
+		  // TODO: probably don't need full matrix, but run it for now.
+		for (int gpuB = 0; gpuB < buffers.get_gpu_count(); ++gpuB) {
+		  double bw = buffers.double_memcpy_probe(nodeA, gpuA, dirA, nodeB, gpuB, dirB);
+		  
+		  // update best pair
+		  if (bw > max_bw) {
+		    max_bw = bw;
+		    max_gpuA = gpuA;
+		    max_gpuB = gpuB;
+		    max_args = std::make_tuple(nodeA, gpuA, dirA, nodeB, gpuB, dirB);
+		  }
 
-	  //break;
-        }
+		  // update worst pair
+		  if (bw < min_bw) {
+		    min_bw = bw;
+		    min_gpuA = gpuA;
+		    min_gpuB = gpuB;
+		    min_args = std::make_tuple(nodeA, gpuA, dirA, nodeB, gpuB, dirB);	    
+		  }
+		  
+		  //break;
+		}
+	      }
+	    }
+	  }
+	}
       }
-      // }
-      // }
     }
+    
+    {
+      bool dirA, dirB;
+      int gpuA, gpuB, nodeA, nodeB;
 
-    std::cout << "GPU pair shared with NIC appears to be " << min_gpuA << " and " << min_gpuB
-              << " with a bandwidth of " << min_bw
-              << std::endl;
-    std::cout << "Best GPU pair was " << max_gpuA << " doing DtoH and " << max_gpuB
-              << " doing HtoD with a bandwidth of " << max_bw
-              << std::endl;
+      std::tie(nodeA, gpuA, dirA, nodeB, gpuB, dirB) = min_args;
+      std::cout << "GPU pair shared with NIC appears to be " << min_gpuA << " and " << min_gpuB
+		<< " with a bandwidth of " << min_bw
+		<< std::endl;
+      
+      std::tie(nodeA, gpuA, dirA, nodeB, gpuB, dirB) = max_args;
+      std::cout << "Best GPU pair was " << max_gpuA << " and " << max_gpuB
+		<< " with a bandwidth of " << max_bw
+		<< std::endl;
+    }
+      
+    // std::cout << "GPU pair shared with NIC appears to be " << min_gpuA << " and " << min_gpuB
+    //           << " with a bandwidth of " << min_bw
+    //           << std::endl;
+    // std::cout << "Best GPU pair was " << max_gpuA << " doing DtoH and " << max_gpuB
+    //           << " doing HtoD with a bandwidth of " << max_bw
+    //           << std::endl;
   }
 
     

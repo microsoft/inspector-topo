@@ -101,19 +101,30 @@ double probe_gpu_bandwidth_from_numa_node(int numa_nodeA, int gpuA, int numa_nod
 
 
 void * GPUBuffers::allocate_cpu_buffer(int numa_node) {
+#ifdef DEBUG_LOG
+  std::cout << "Allocating CPU buffer on node " << numa_node << "." << std::endl;
+#endif
+  
   // what NUMA node are we allocating from right now?
-  int prev_preferred = numa_preferred();
-  std::cout << "Previous preferred: " << prev_preferred << std::endl;
+  int prev_preferred = -1; //numa_preferred();
 
   // set NUMA node for this allocation
   numa_set_preferred(numa_node);
 
   // allocate buffer
   void * host_buf = nullptr;
-  CHECK_CUDA(cudaHostAlloc(&host_buf, FLAGS_length, cudaHostAllocWriteCombined));
+  if (use_write_combining) {
+    CHECK_CUDA(cudaHostAlloc(&host_buf, FLAGS_length, cudaHostAllocWriteCombined));
+  } else {
+    CHECK_CUDA(cudaHostAlloc(&host_buf, FLAGS_length, cudaHostAllocMapped));
+  }
 
   // restore previous NUMA policy
   numa_set_preferred(prev_preferred);
+
+#ifdef DEBUG_LOG
+  std::cout << "Allocated CPU buffer on node " << numa_node << " at " << host_buf << "." << std::endl;
+#endif
 
   // return buffer
   return host_buf;
@@ -124,9 +135,17 @@ void GPUBuffers::free_cpu_buffer(void * buf) {
 }
 
 void * GPUBuffers::allocate_gpu_buffer(int gpu_id) {
+#ifdef DEBUG_LOG
+  std::cout << "Allocating GPU buffer on GPU " << gpu_id << "." << std::endl;
+#endif
+  
   void * device_buf = nullptr;
   CHECK_CUDA(cudaSetDevice(gpu_id));
   CHECK_CUDA(cudaMalloc(&device_buf, FLAGS_length));
+
+#ifdef DEBUG_LOG
+  std::cout << "Allocating GPU buffer at " << device_buf << " on GPU " << gpu_id << "." << std::endl;
+#endif
   return device_buf;
 }
 
@@ -134,25 +153,53 @@ void GPUBuffers::free_gpu_buffer(void * buf) {
   CHECK_CUDA(cudaFree(buf));
 }
 
-void GPUBuffers::allocate_gpu_stream(int gpu_id, cudaStream_t * stream) {
+void GPUBuffers::allocate_gpu_stream(int gpu_id, cudaStream_t * stream_p) {
+#ifdef DEBUG_LOG
+  std::cout << "Allocating GPU stream on GPU " << gpu_id << "." << std::endl;
+#endif
+
   CHECK_CUDA(cudaSetDevice(gpu_id));
-  CHECK_CUDA(cudaStreamCreateWithFlags(stream, cudaStreamNonBlocking));
+  CHECK_CUDA(cudaStreamCreateWithFlags(stream_p, cudaStreamNonBlocking));
+
+#ifdef DEBUG_LOG
+  std::cout << "Allocated GPU stream " << *stream_p << " on GPU " << gpu_id << "." << std::endl;
+#endif
 }
 
-void GPUBuffers::free_gpu_stream(cudaStream_t * stream) {
-  CHECK_CUDA(cudaStreamDestroy(*stream));
-  *stream = nullptr;
+void GPUBuffers::free_gpu_stream(cudaStream_t * stream_p) {
+  CHECK_CUDA(cudaStreamDestroy(*stream_p));
+  *stream_p = nullptr;
 }
 
 
-double GPUBuffers::double_memcpy_probe(int numa_nodeA, int gpuA, 
-                                       int numa_nodeB, int gpuB) {
+double GPUBuffers::double_memcpy_probe(int numa_nodeA, int gpuA, bool htod_or_dtohA, 
+                                       int numa_nodeB, int gpuB, bool htod_or_dtohB) {
+#ifdef DEBUG_LOG
+  std::cout << "Doing memcpy "
+	    << " between GPU " << gpuA << " buffer " << gpu_buffers[gpuA]
+	    << " and NUMA node " << numa_nodeA << " buffer " << cpu_buffers[numa_nodeA]
+	    << " doing " << (htod_or_dtohA ? "HtoD" : "DtoH")
+	    << " and between GPU " << gpuB << " buffer " << gpu_buffers[gpuB]
+	    << " and NUMA node " << numa_nodeB << " buffer " << cpu_buffers[numa_nodeB]
+	    << " doing " << (htod_or_dtohB ? "HtoD" : "DtoH")
+	    << std::endl;
+#endif
+
+  auto copy = [&] (int numa_node, int gpu, bool htod_or_dtoh) {
+    CHECK_CUDA(cudaSetDevice(gpu));    
+    if (htod_or_dtoh) {
+      CHECK_CUDA(cudaMemcpyAsync(cpu_buffers[numa_node], gpu_buffers[gpu], FLAGS_length,
+				 cudaMemcpyDeviceToHost, gpu_streams[gpu]));
+    } else {
+      CHECK_CUDA(cudaMemcpyAsync(gpu_buffers[gpu], cpu_buffers[numa_node], FLAGS_length,
+				 cudaMemcpyHostToDevice, gpu_streams[gpu]));
+    }
+  };
+  
   auto start_time = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < FLAGS_bw_iters; ++i) {
-    CHECK_CUDA(cudaSetDevice(gpuA));  
-    CHECK_CUDA(cudaMemcpyAsync(cpu_buffers[numa_nodeA], gpu_buffers[gpuA], FLAGS_length, cudaMemcpyDeviceToHost, gpu_streams[gpuA]));
-    CHECK_CUDA(cudaSetDevice(gpuB));  
-    CHECK_CUDA(cudaMemcpyAsync(gpu_buffers[gpuB], cpu_buffers[numa_nodeB], FLAGS_length, cudaMemcpyHostToDevice, gpu_streams[gpuB]));    
+    copy(numa_nodeA, gpuA, htod_or_dtohA);
+    copy(numa_nodeB, gpuB, htod_or_dtohB);
   }
 
   CHECK_CUDA(cudaSetDevice(gpuA));
@@ -164,8 +211,12 @@ double GPUBuffers::double_memcpy_probe(int numa_nodeA, int gpuA,
   uint64_t time_difference_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
   double bw = (double) FLAGS_length / (time_difference_ns / 1e9) / 1024 / 1024 / 1024 * FLAGS_bw_iters;
   std::cout << "Measured per-GPU bandwidth of " << bw
-	    << " for GPU " << gpuA << " on NUMA node " << numa_nodeA << " doing DtoH" 
-	    << " and GPU " << gpuB << " on NUMA node " << numa_nodeB << " doing HtoD" 
+	    << " between GPU " << gpuA << " buffer " << gpu_buffers[gpuA]
+	    << " and NUMA node " << numa_nodeA << " buffer " << cpu_buffers[numa_nodeA]
+	    << " doing " << (htod_or_dtohA ? "HtoD" : "DtoH")
+	    << " and between GPU " << gpuB << " buffer " << gpu_buffers[gpuB]
+	    << " and NUMA node " << numa_nodeB << " buffer " << cpu_buffers[numa_nodeB]
+	    << " doing " << (htod_or_dtohB ? "HtoD" : "DtoH")
 	    << std::endl;
   return bw;
 }
