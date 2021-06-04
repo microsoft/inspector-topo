@@ -46,10 +46,10 @@ private:
   void free_gpu_stream(cudaStream_t *);
   
 public:
-  GPUBuffers(bool use_write_combining = false)
+  GPUBuffers(bool wc = false)
     : gpu_count(-1)
     , numa_node_count(numa_max_node()+1)
-    , use_write_combining(use_write_combining)
+    , use_write_combining(wc)
     , cpu_buffers(numa_node_count)
     , gpu_buffers()
     , gpu_streams()

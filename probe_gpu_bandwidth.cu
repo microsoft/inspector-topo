@@ -14,6 +14,7 @@
 
 DECLARE_int64(length);
 DEFINE_int32(bw_iters, 10, "Number of iterations to run when measuring GPU bandwidth.");
+DEFINE_int32(bw_warmup_iters, 1, "Number of warmup iterations to run when measuring GPU bandwidth.");
 
 int gpu_count() {
   int deviceCount;
@@ -195,28 +196,43 @@ double GPUBuffers::double_memcpy_probe(int numa_nodeA, int gpuA, bool htod_or_dt
 				 cudaMemcpyHostToDevice, gpu_streams[gpu]));
     }
   };
-  
-  auto start_time = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < FLAGS_bw_iters; ++i) {
-    copy(numa_nodeA, gpuA, htod_or_dtohA);
-    copy(numa_nodeB, gpuB, htod_or_dtohB);
-  }
 
-  CHECK_CUDA(cudaSetDevice(gpuA));
-  CHECK_CUDA(cudaStreamSynchronize(gpu_streams[gpuA]));
-  CHECK_CUDA(cudaSetDevice(gpuB));
-  CHECK_CUDA(cudaStreamSynchronize(gpu_streams[gpuB]));
+  auto run = [&] (int iters) {
+    for (int i = 0; i < iters; ++i) {
+      copy(numa_nodeA, gpuA, htod_or_dtohA);
+      copy(numa_nodeB, gpuB, htod_or_dtohB);
+    }
+    
+    CHECK_CUDA(cudaSetDevice(gpuA));
+    CHECK_CUDA(cudaStreamSynchronize(gpu_streams[gpuA]));
+    CHECK_CUDA(cudaSetDevice(gpuB));
+    CHECK_CUDA(cudaStreamSynchronize(gpu_streams[gpuB]));
+  };
+  
+  // warmup iteration
+  run(FLAGS_bw_warmup_iters);
+  
+  // timed run
+  auto start_time = std::chrono::high_resolution_clock::now();
+  run(FLAGS_bw_iters);
   auto end_time = std::chrono::high_resolution_clock::now();  
 
   uint64_t time_difference_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
   double bw = (double) FLAGS_length / (time_difference_ns / 1e9) / 1024 / 1024 / 1024 * FLAGS_bw_iters;
-  std::cout << "Measured per-GPU bandwidth of " << bw
-	    << " between GPU " << gpuA << " buffer " << gpu_buffers[gpuA]
-	    << " and NUMA node " << numa_nodeA << " buffer " << cpu_buffers[numa_nodeA]
-	    << " doing " << (htod_or_dtohA ? "HtoD" : "DtoH")
-	    << " and between GPU " << gpuB << " buffer " << gpu_buffers[gpuB]
-	    << " and NUMA node " << numa_nodeB << " buffer " << cpu_buffers[numa_nodeB]
-	    << " doing " << (htod_or_dtohB ? "HtoD" : "DtoH")
-	    << std::endl;
+  // std::cout << "Measured per-GPU bandwidth of " << bw
+  // 	    << " between GPU " << gpuA << " buffer " << gpu_buffers[gpuA]
+  // 	    << " and NUMA node " << numa_nodeA << " buffer " << cpu_buffers[numa_nodeA]
+  // 	    << " doing " << (htod_or_dtohA ? "HtoD" : "DtoH")
+  // 	    << " and between GPU " << gpuB << " buffer " << gpu_buffers[gpuB]
+  // 	    << " and NUMA node " << numa_nodeB << " buffer " << cpu_buffers[numa_nodeB]
+  // 	    << " doing " << (htod_or_dtohB ? "HtoD" : "DtoH")
+  // 	    << std::endl;
+
+  std::cout << "WC:" << use_write_combining
+	    << " GPU:" << gpuA << " node:" << numa_nodeA << " dir:" << (htod_or_dtohA ? "HtoD" : "DtoH")
+	    << " GPU:" << gpuB << " node:" << numa_nodeB << " dir:" << (htod_or_dtohB ? "HtoD" : "DtoH")
+	    << " BW:" << bw
+  	    << std::endl;
+  
   return bw;
 }
