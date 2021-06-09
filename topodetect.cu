@@ -62,12 +62,12 @@ int main(int argc, char * argv[]) {
     //int retval = setenv("CUDA_VISIBLE_DEVICES", "0,1,2,3,4,5,6,7", 1);
     
     // try both mapped and WC allocation
-    for (int wc = false; wc <= true; ++wc) {
+    for (int wc = false; wc <= false; ++wc) {
       GPUBuffers buffers(wc);
       
       // try both HtoD (true) and DtoH (false) directions
-      for (int dirA = false; dirA <= true; ++dirA) {
-	for (int dirB = false; dirB <= true; ++dirB) {
+      for (int dirA = false; dirA <= false; ++dirA) {
+	for (int dirB = true; dirB <= true; ++dirB) {
 	
 	  for (int nodeA = 0; nodeA < buffers.get_cpu_count(); ++nodeA) {
 	    for (int nodeB = 0; nodeB < buffers.get_cpu_count(); ++nodeB) {
@@ -78,6 +78,8 @@ int main(int argc, char * argv[]) {
 		//for (int gpuB = gpuA + 1; gpuB < gpu_count; ++gpuB) {
 		// TODO: probably don't need full matrix, but run it for now.
 		for (int gpuB = 0; gpuB < buffers.get_gpu_count(); ++gpuB) {
+	          if (gpuA == gpuB)
+		    continue;
 		  double bw = buffers.double_memcpy_probe(nodeA, gpuA, dirA, nodeB, gpuB, dirB);
 		  
 		  // update best pair
