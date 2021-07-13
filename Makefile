@@ -30,6 +30,9 @@ $(TARGET): $(OBJECTS)
 %.o: %.cu Makefile
 	$(NVCC) $(CXXFLAGS) -c -o $@ $<
 
+install:: $(TARGET)
+	sudo cp $(TARGET) /usr/local/bin/$(TARGET)
+
 clean::
 	rm -f $(TARGET) $(OBJECTS) *.o
 
