@@ -1,5 +1,5 @@
 ## Copyright (c) Microsoft Corporation.
-## All rights reserved.
+## Licensed under the MIT License.
 
 TARGET=topodetect
 OBJECTS=topodetect.o Endpoint.o Loopback.o probe_latency.o LoopbackFlow.o probe_gpu_bandwidth.o

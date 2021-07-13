@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation.
-// All rights reserved.
+// Licensed under the MIT License.
 
 #ifndef __LOOPBACK__
 #define __LOOPBACK__
