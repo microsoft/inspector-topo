@@ -1,25 +1,23 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+#include "Options.hpp"
 #include "probe_latency.hpp"
 #include "LoopbackFlow.hpp"
 #include "probe_gpu_bandwidth.hpp"
 
 #include <cstdlib>
-#include <gflags/gflags.h>
 #include <numa.h>
 
 #include <vector>
 #include <limits>
 #include <tuple>
-
-DEFINE_int32(warmup,       100, "Number of warmup iterations to run before timing (defults to 100).");
-DEFINE_int32(iters,       1000, "Number of timed iterations to run (defaults to 1000).");
-DEFINE_int64(length, 1LL << 30, "Length of test buffers in bytes (defaults to 1 GB).");
+#include <memory>
 
 int main(int argc, char * argv[]) {
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
-
+  // initialize global options object
+  Options::options = std::make_unique<Options>(&argc, &argv);
+  
   if (-1 == numa_available()) {
     std::cerr << "NUMA not available. Cannot probe topology." << std::endl;
     exit(1);

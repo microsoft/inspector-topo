@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 
+#include "Options.hpp"
 #include "probe_gpu_bandwidth.hpp"
 #include <iostream>
 #include <chrono>
@@ -11,10 +12,6 @@
 //#include <x86intrin.h> // TODO: nvcc doesn't like this on some CUDA versions with some GCC versions?
 #include <numa.h>
 #include <gflags/gflags.h>
-
-DECLARE_int64(length);
-DEFINE_int32(bw_iters, 10, "Number of iterations to run when measuring GPU bandwidth.");
-DEFINE_int32(bw_warmup_iters, 1, "Number of warmup iterations to run when measuring GPU bandwidth.");
 
 int gpu_count() {
   int deviceCount;
@@ -50,8 +47,8 @@ double probe_gpu_bandwidth_from_numa_node(int numa_nodeA, int gpuA, int numa_nod
   void * gpuA_host_buf = nullptr;
   void * gpuA_device_buf = nullptr;
   CHECK_CUDA(cudaSetDevice(gpuA));
-  CHECK_CUDA(cudaHostAlloc(&gpuA_host_buf, FLAGS_length, cudaHostAllocMapped));
-  CHECK_CUDA(cudaMalloc(&gpuA_device_buf, FLAGS_length));  
+  CHECK_CUDA(cudaHostAlloc(&gpuA_host_buf, Options::options->length, cudaHostAllocMapped));
+  CHECK_CUDA(cudaMalloc(&gpuA_device_buf, Options::options->length));  
 
   cudaStream_t gpuA_stream;
   CHECK_CUDA(cudaStreamCreateWithFlags(&gpuA_stream, cudaStreamNonBlocking));
@@ -61,8 +58,8 @@ double probe_gpu_bandwidth_from_numa_node(int numa_nodeA, int gpuA, int numa_nod
   void * gpuB_host_buf = nullptr;
   void * gpuB_device_buf = nullptr;
   CHECK_CUDA(cudaSetDevice(gpuB));
-  CHECK_CUDA(cudaHostAlloc(&gpuB_host_buf, FLAGS_length, cudaHostAllocMapped));
-  CHECK_CUDA(cudaMalloc(&gpuB_device_buf, FLAGS_length));
+  CHECK_CUDA(cudaHostAlloc(&gpuB_host_buf, Options::options->length, cudaHostAllocMapped));
+  CHECK_CUDA(cudaMalloc(&gpuB_device_buf, Options::options->length));
 
   cudaStream_t gpuB_stream;
   CHECK_CUDA(cudaStreamCreateWithFlags(&gpuB_stream, cudaStreamNonBlocking));
@@ -71,12 +68,12 @@ double probe_gpu_bandwidth_from_numa_node(int numa_nodeA, int gpuA, int numa_nod
   //numa_run_on_node(-1);
     
   auto start_time = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < FLAGS_bw_iters; ++i) {
+  for (int i = 0; i < Options::options->bw_iters; ++i) {
     CHECK_CUDA(cudaSetDevice(gpuA));  
-    CHECK_CUDA(cudaMemcpyAsync(gpuA_host_buf, gpuA_device_buf, FLAGS_length, cudaMemcpyDeviceToHost, gpuA_stream));
+    CHECK_CUDA(cudaMemcpyAsync(gpuA_host_buf, gpuA_device_buf, Options::options->length, cudaMemcpyDeviceToHost, gpuA_stream));
     CHECK_CUDA(cudaSetDevice(gpuB));  
-    //CHECK_CUDA(cudaMemcpyAsync(gpuB_host_buf, gpuB_device_buf, FLAGS_length, cudaMemcpyDeviceToHost, gpuB_stream));
-    CHECK_CUDA(cudaMemcpyAsync(gpuB_device_buf, gpuB_host_buf, FLAGS_length, cudaMemcpyHostToDevice, gpuB_stream));    
+    //CHECK_CUDA(cudaMemcpyAsync(gpuB_host_buf, gpuB_device_buf, Options::options->length, cudaMemcpyDeviceToHost, gpuB_stream));
+    CHECK_CUDA(cudaMemcpyAsync(gpuB_device_buf, gpuB_host_buf, Options::options->length, cudaMemcpyHostToDevice, gpuB_stream));    
   }
 
   CHECK_CUDA(cudaSetDevice(gpuA));
@@ -92,7 +89,7 @@ double probe_gpu_bandwidth_from_numa_node(int numa_nodeA, int gpuA, int numa_nod
   CHECK_CUDA(cudaFree(gpuB_device_buf));
   
   uint64_t time_difference_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
-  double bw = (double) FLAGS_length / (time_difference_ns / 1e9) / 1024 / 1024 / 1024 * FLAGS_bw_iters;
+  double bw = (double) Options::options->length / (time_difference_ns / 1e9) / 1024 / 1024 / 1024 * Options::options->bw_iters;
   std::cout << "Measured per-GPU bandwidth of " << bw
 	    << " for GPU " << gpuA << " on NUMA node " << numa_nodeA << " doing DtoH" 
 	    << " and GPU " << gpuB << " on NUMA node " << numa_nodeB << " doing HtoD" 
@@ -115,9 +112,9 @@ void * GPUBuffers::allocate_cpu_buffer(int numa_node) {
   // allocate buffer
   void * host_buf = nullptr;
   if (use_write_combining) {
-    CHECK_CUDA(cudaHostAlloc(&host_buf, FLAGS_length, cudaHostAllocWriteCombined));
+    CHECK_CUDA(cudaHostAlloc(&host_buf, Options::options->length, cudaHostAllocWriteCombined));
   } else {
-    CHECK_CUDA(cudaHostAlloc(&host_buf, FLAGS_length, cudaHostAllocMapped));
+    CHECK_CUDA(cudaHostAlloc(&host_buf, Options::options->length, cudaHostAllocMapped));
   }
 
   // restore previous NUMA policy
@@ -142,7 +139,7 @@ void * GPUBuffers::allocate_gpu_buffer(int gpu_id) {
   
   void * device_buf = nullptr;
   CHECK_CUDA(cudaSetDevice(gpu_id));
-  CHECK_CUDA(cudaMalloc(&device_buf, FLAGS_length));
+  CHECK_CUDA(cudaMalloc(&device_buf, Options::options->length));
 
 #ifdef DEBUG_LOG
   std::cout << "Allocating GPU buffer at " << device_buf << " on GPU " << gpu_id << "." << std::endl;
@@ -189,10 +186,10 @@ double GPUBuffers::double_memcpy_probe(int numa_nodeA, int gpuA, bool htod_or_dt
   auto copy = [&] (int numa_node, int gpu, bool htod_or_dtoh) {
     CHECK_CUDA(cudaSetDevice(gpu));    
     if (htod_or_dtoh) {
-      CHECK_CUDA(cudaMemcpyAsync(cpu_buffers[numa_node], gpu_buffers[gpu], FLAGS_length,
+      CHECK_CUDA(cudaMemcpyAsync(cpu_buffers[numa_node], gpu_buffers[gpu], Options::options->length,
 				 cudaMemcpyDeviceToHost, gpu_streams[gpu]));
     } else {
-      CHECK_CUDA(cudaMemcpyAsync(gpu_buffers[gpu], cpu_buffers[numa_node], FLAGS_length,
+      CHECK_CUDA(cudaMemcpyAsync(gpu_buffers[gpu], cpu_buffers[numa_node], Options::options->length,
 				 cudaMemcpyHostToDevice, gpu_streams[gpu]));
     }
   };
@@ -210,15 +207,15 @@ double GPUBuffers::double_memcpy_probe(int numa_nodeA, int gpuA, bool htod_or_dt
   };
   
   // warmup iteration
-  run(FLAGS_bw_warmup_iters);
+  run(Options::options->bw_warmup_iters);
   
   // timed run
   auto start_time = std::chrono::high_resolution_clock::now();
-  run(FLAGS_bw_iters);
+  run(Options::options->bw_iters);
   auto end_time = std::chrono::high_resolution_clock::now();  
 
   uint64_t time_difference_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
-  double bw = (double) FLAGS_length / (time_difference_ns / 1e9) / 1024 / 1024 / 1024 * FLAGS_bw_iters;
+  double bw = (double) Options::options->length / (time_difference_ns / 1e9) / 1024 / 1024 / 1024 * Options::options->bw_iters;
   // std::cout << "Measured per-GPU bandwidth of " << bw
   // 	    << " between GPU " << gpuA << " buffer " << gpu_buffers[gpuA]
   // 	    << " and NUMA node " << numa_nodeA << " buffer " << cpu_buffers[numa_nodeA]

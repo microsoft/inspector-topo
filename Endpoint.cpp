@@ -2,15 +2,13 @@
 // Licensed under the MIT License.
 
 #include "Endpoint.hpp"
+#include "Options.hpp"
+
 #include <sys/mman.h>
 
 #include <x86intrin.h>
 #include <thread>
 #include <unistd.h>
-
-DEFINE_string(device, "mlx5_0", "Name of Verbs device");
-DEFINE_int32(device_port, 1, "Port on Verbs device (usually 1-indexed, so should usually be 1)");
-DEFINE_int32(gid_index, 3, "Verbs device GID index. 0: RoCEv1 with MAC-based GID, 1: RoCEv2 with MAC-based GID, 2: RoCEv1 with IP-based GID, 3: RoCEv2 with IP-based GIDPort on Verbs device");
 
 Endpoint::Endpoint()
   : devices(nullptr)
@@ -19,9 +17,9 @@ Endpoint::Endpoint()
   , device_name(nullptr)
   , device_guid(0)
   , device_attributes() // clear later
-  , port(FLAGS_device_port) // port is generally 1-indexed
+  , port(Options::options->device_port) // port is generally 1-indexed
   , port_attributes() // clear later
-  , gid_index(FLAGS_gid_index) // use RoCEv2 with IP-based GID
+  , gid_index(Options::options->gid_index) // use RoCEv2 with IP-based GID
   , gid({.global = {0, 0}})
   , context(nullptr)
   , protection_domain(nullptr)
@@ -46,7 +44,7 @@ Endpoint::Endpoint()
                 << " with guid " << (void*) be64toh(ibv_get_device_guid(devices[i])) 
                 << std::endl;
 #endif
-    if ((num_devices == 1) || (FLAGS_device == ibv_get_device_name(devices[i])))  {
+    if ((num_devices == 1) || (Options::options->device == ibv_get_device_name(devices[i])))  {
       // choose this device
       device = devices[i];
       device_name = ibv_get_device_name(device);
@@ -56,7 +54,7 @@ Endpoint::Endpoint()
   
   // ensure we found a device
   if (!device)  {
-    std::cerr << "Didn't find device " << FLAGS_device << "\n";
+    std::cerr << "Didn't find device " << Options::options->device << "\n";
     exit(1);
   } 
 #ifdef DEBUG_LOG
@@ -81,14 +79,14 @@ Endpoint::Endpoint()
   // choose a port on the device and get port attributes
 #ifdef DEBUG_LOG
   if (device_attributes.phys_port_cnt > 1)  {
-      std::cout << (int) device_attributes.phys_port_cnt << " ports detected; using port " << (int) FLAGS_device_port << std::endl;
+      std::cout << (int) device_attributes.phys_port_cnt << " ports detected; using port " << (int) Options::options->device_port << std::endl;
   }
 #endif
-  if (device_attributes.phys_port_cnt < FLAGS_device_port)  {
-    std::cerr << "expected " << (int) FLAGS_device_port << " ports, but found " << (int) device_attributes.phys_port_cnt;
+  if (device_attributes.phys_port_cnt < Options::options->device_port)  {
+    std::cerr << "expected " << (int) Options::options->device_port << " ports, but found " << (int) device_attributes.phys_port_cnt << std::endl;
     exit(1);
   }
-  port = FLAGS_device_port;
+  port = Options::options->device_port;
   retval = ibv_query_port(context, port, &port_attributes);
   if (retval < 0)  {
     perror("Error getting port attributes");
@@ -112,7 +110,7 @@ Endpoint::Endpoint()
   }
 
   // get selected gid
-  retval = ibv_query_gid(context, port, FLAGS_gid_index, &gid);
+  retval = ibv_query_gid(context, port, Options::options->gid_index, &gid);
   if (retval < 0)  {
     perror("Error getting GID");
     exit(1);

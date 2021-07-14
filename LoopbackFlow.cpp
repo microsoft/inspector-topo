@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+#include "Options.hpp"
 #include "LoopbackFlow.hpp"
 #include "Loopback.hpp"
 
@@ -10,9 +11,6 @@
 #include <vector>
 
 #include <numa.h>
-
-DECLARE_int64(length);
-DEFINE_int32(concurrent_reads, 4, "Number of concurrent reads for loopback flow bandwidth probe.");
 
 void LoopbackFlow::thread_body(int numa_node) {
 #ifdef DEBUG_LOG
@@ -29,15 +27,15 @@ void LoopbackFlow::thread_body(int numa_node) {
   
   // Allocate memory region. We copy to and from the same buffer,
   // since we care only about data movement, not the result.
-  ibv_mr * mr = e.allocate(FLAGS_length);
+  ibv_mr * mr = e.allocate(Options::options->length);
 
   // reuse same SGE for all reads
   ibv_sge send_sge;
   send_sge.addr   = reinterpret_cast<uintptr_t>(mr->addr);
-  send_sge.length = FLAGS_length;
+  send_sge.length = Options::options->length;
   send_sge.lkey   = mr->lkey;
     
-  const int concurrent_reads = FLAGS_concurrent_reads;
+  const int concurrent_reads = Options::options->concurrent_reads;
   ibv_send_wr send_wr[concurrent_reads];
   for (int i = 0; i < concurrent_reads; ++i) {
     send_wr[i].wr_id = i;

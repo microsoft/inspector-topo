@@ -22,8 +22,6 @@
 
 #include "Endpoint.hpp"
 
-DECLARE_int32(packet_size);
-
 class Loopback {
 private:
 

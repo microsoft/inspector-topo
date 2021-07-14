@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+#include "Options.hpp"
 #include "probe_latency.hpp"
 
 #include <gflags/gflags.h>
@@ -13,10 +14,6 @@
 
 #include <x86intrin.h>
 
-
-DECLARE_int32(warmup);
-DECLARE_int32(iters);
-DECLARE_int64(length);
 
 /// Run a lambda on a core. Lambda should return a double. Restore
 /// previous CPU affinity after running.
@@ -81,7 +78,7 @@ double probe_latency() {
   
   // Allocate memory region. We copy to and from the same buffer,
   // since we care only about data movement, not the result.
-  ibv_mr * mr = e.allocate(FLAGS_length);
+  ibv_mr * mr = e.allocate(Options::options->length);
 
   ibv_sge send_sge;
   send_sge.addr   = reinterpret_cast<uintptr_t>(mr->addr);
@@ -99,7 +96,7 @@ double probe_latency() {
   send_wr.wr.rdma.rkey = mr->rkey;
 
   // do warmup iterations
-  for (int i = 0; i < FLAGS_warmup; ++i) {
+  for (int i = 0; i < Options::options->warmup; ++i) {
     // post send to start sending
     send_wr.wr_id = i; // set WR ID to iteration
     lp.post_send(&send_wr);
@@ -121,11 +118,11 @@ double probe_latency() {
   
   // record the time whenever we complete 
   std::vector<uint64_t> send_times;
-  send_times.reserve(FLAGS_iters + 1); // preallocate space for each probe
+  send_times.reserve(Options::options->iters + 1); // preallocate space for each probe
   
   // Record start time and do probes
   send_times.push_back(__rdtsc()); // record initial time
-  for (int i = 0; i < FLAGS_iters; ++i) {
+  for (int i = 0; i < Options::options->iters; ++i) {
     // post send to start sending
     send_wr.wr_id = i; // set WR ID to iteration
     lp.post_send(&send_wr);
@@ -151,7 +148,7 @@ double probe_latency() {
 
   // compute time taken for each send
   std::vector<double> time_differences_us;
-  for (int i = 0; i < FLAGS_iters; ++i) {
+  for (int i = 0; i < Options::options->iters; ++i) {
     auto start_time = send_times[i];
     auto end_time = send_times[i+1];
     double time_difference_us = (end_time - start_time) / (e.get_ticks_per_sec() / 1.0e6);

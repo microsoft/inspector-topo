@@ -17,11 +17,10 @@ Requirements
 The tool currently depends on these libraries:
 * ibverbs (but is likely already installed)
 * numa
-* gflags
 
 On Ubuntu, you can install them like this:
 ```
-sudo apt install libnuma-dev libgflags-dev
+sudo apt install libnuma-dev
 ```
 
 Building
