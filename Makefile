@@ -1,8 +1,8 @@
 ## Copyright (c) Microsoft Corporation.
 ## Licensed under the MIT License.
 
-TARGET=topodetect
-OBJECTS=topodetect.o Endpoint.o Loopback.o probe_latency.o LoopbackFlow.o probe_gpu_bandwidth.o
+TARGET=inspector-topo
+OBJECTS=inspector-topo.o Endpoint.o Loopback.o probe_latency.o LoopbackFlow.o probe_gpu_bandwidth.o
 
 # Uncomment to enable verbose debug logging
 ###DEBUG_LOG=-DDEBUG_LOG

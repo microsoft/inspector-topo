@@ -8,10 +8,6 @@
 #include <thread>
 #include <unistd.h>
 
-extern "C" {
-#include <hugetlbfs.h>
-}
-
 DEFINE_string(device, "mlx5_0", "Name of Verbs device");
 DEFINE_int32(device_port, 1, "Port on Verbs device (usually 1-indexed, so should usually be 1)");
 DEFINE_int32(gid_index, 3, "Verbs device GID index. 0: RoCEv1 with MAC-based GID, 1: RoCEv2 with MAC-based GID, 2: RoCEv1 with IP-based GID, 3: RoCEv2 with IP-based GIDPort on Verbs device");
@@ -204,9 +200,9 @@ void Endpoint::deregister_region(ibv_mr * mr) {
 ibv_mr * Endpoint::allocate(size_t length,
                             bool use_hugepages,
                             void * requested_address) {
-  // round up to default huge page size
-  // TODO: guess 2MB huge pages for now to avoid using hugetlbfs in Docker container
-  size_t hugepagesize = 1ULL << 21; //gethugepagesize();
+  // round up to huge page size
+  // TODO: guess 1GB huge pages for now to avoid using hugetlbfs in Docker container
+  size_t hugepagesize = 1ULL << 30;
   if (hugepagesize < 0) {
     std::cerr << "Error getting default huge page size" << std::endl;
     exit(1);
