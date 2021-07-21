@@ -22,7 +22,7 @@ void Options::print_help_and_exit() {
             << "  --concurrent_reads/-r (Number of concurrent reads for loopback flow bandwidth\n"
             << "     probe.) type: int32 default: 4\n"
             << "  --bw_iters/-b (Number of iterations to run when measuring GPU bandwidth.)\n"
-            << "     type: int32 default: 10\n"
+            << "     type: int32 default: 5\n"
             << "  --bw_warmup_iters/-t (Number of warmup iterations to run when measuring GPU\n"
             << "     bandwidth.) type: int32 default: 1\n"
             << "  --iters/-i (Number of timed iterations to run (defaults to 1000).) type: int32\n"
@@ -46,7 +46,7 @@ Options::Options()
   , iters(1000)
   , length(1LL << 30)
   , concurrent_reads(4)
-  , bw_iters(10)
+  , bw_iters(5)
   , bw_warmup_iters(1) {
 }
 

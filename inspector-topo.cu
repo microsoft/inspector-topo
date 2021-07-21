@@ -67,10 +67,12 @@ int main(int argc, char * argv[]) {
       for (int dirA = false; dirA <= false; ++dirA) {
 	for (int dirB = true; dirB <= true; ++dirB) {
 	
-	  for (int nodeA = 0; nodeA < buffers.get_cpu_count(); ++nodeA) {
-	    for (int nodeB = 0; nodeB < buffers.get_cpu_count(); ++nodeB) {
-	      //int nodeA = min_numa_node;
-	      //int nodeB = min_numa_node;
+	  // for (int nodeA = 0; nodeA < buffers.get_cpu_count(); ++nodeA) {
+	    // for (int nodeB = 0; nodeB < buffers.get_cpu_count(); ++nodeB) {
+          {
+            {
+	      int nodeA = min_numa_node;
+	      int nodeB = min_numa_node;
       
 	      for (int gpuA = 0; gpuA < buffers.get_gpu_count(); ++gpuA) {
 		//for (int gpuB = gpuA + 1; gpuB < gpu_count; ++gpuB) {
