@@ -15,8 +15,8 @@ Requirements
 ------------
 
 The tool currently depends on these libraries:
-* ibverbs (but is likely already installed)
-* numa
+* ibverbs (specifically libibverbs-dev on Ubuntu, but if it's not already installed you probably have IB/RDMA driver problems)
+* numa (specifically libnuma-dev)
 
 On Ubuntu, you can install them like this:
 ```
