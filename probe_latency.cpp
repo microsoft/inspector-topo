@@ -4,8 +4,6 @@
 #include "Options.hpp"
 #include "probe_latency.hpp"
 
-#include <gflags/gflags.h>
-
 #include <iostream>
 #include <vector>
 #include <algorithm>

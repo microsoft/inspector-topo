@@ -8,7 +8,6 @@
 #include <cstring>
 #include <iostream>
 #include <endian.h>
-#include <gflags/gflags.h>
 #include <vector>
 #include <string>
 #include <sstream>

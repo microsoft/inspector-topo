@@ -5,8 +5,6 @@
 #include "LoopbackFlow.hpp"
 #include "Loopback.hpp"
 
-#include <gflags/gflags.h>
-
 #include <iostream>
 #include <vector>
 

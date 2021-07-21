@@ -9,7 +9,6 @@
 #include <iostream>
 #include <unordered_set>
 #include <endian.h>
-#include <gflags/gflags.h>
 
 class Loopback;
 
