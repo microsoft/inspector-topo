@@ -38,7 +38,7 @@ Running
 
 GPU IDs are not yet handled in a smart way. You MUST set ```CUDA_VISIBLE_DEVICES``` before running to get results that make sense. For now on the 8-GPU ND40v2 nodes, use a command like this:
 ```
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./topodetect
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./inspector-topo
 ```
 
 For the GPU bandwidth tests, the tool defaults to copying a 1 GB buffer 10 times. This is probably fine, but you can change the buffer size with the ```--length``` flag and the GPU bandwidth iteration count with the ```--bw_iters``` flag if you want.
